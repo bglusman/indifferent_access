@@ -4,13 +4,14 @@ defmodule IndifferentAccess.MixProject do
   def project do
     [
       app: :indifferent_access,
-      version: "0.1.1",
+      version: "0.1.3",
       elixir: "~> 1.8",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       name: "IndifferentAccess",
       source_url: "https://github.com/bglusman/indifferent_access",
-      description: "Elixir library for various strategies/experiments for avoiding string access to conn params", 
+      description:
+        "Elixir library for various strategies/experiments for avoiding string access to conn params",
       package: package()
     ]
   end
