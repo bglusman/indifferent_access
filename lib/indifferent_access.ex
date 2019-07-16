@@ -12,29 +12,27 @@ defmodule IndifferentAccess do
 
   ## Examples
       iex> IndifferentAccess.indifferentize(%{"schedulers" => "4"})
-      %IndifferentAccess.Params{params: %{"schedulers" => "4"}}
+      %IndifferentAccess.Params{params: %{"schedulers" => "4"}, opts: [as: :struct, strategy: :replace]}
 
-      iex> IndifferentAccess.indifferentize(%{"schedulers" => "4"})[:schedulers]
+      iex> IndifferentAccess.indifferentize(%{"schedulers" => "4"}, as: :struct, strategy: :replace)[:schedulers]
       "4"
 
-      iex> IndifferentAccess.indifferentize(%{"schedulers" => %{"tls" => "3"}})[:schedulers][:tls]
+      iex> IndifferentAccess.indifferentize(%{"schedulers" => %{"tls" => "3"}}, as: :struct, strategy: :replace)[:schedulers][:tls]
       "3"
 
-      iex> IndifferentAccess.indifferentize(%{"schedulers" => %{"tls" => "3"}}, strategy: :static)[:schedulers][:tls]
+      iex> IndifferentAccess.indifferentize(%{"schedulers" => %{"tls" => "3"}}, as: :struct, strategy: :static)[:schedulers][:tls]
       nil
 
-      iex> IndifferentAccess.initialize_atoms_map()
-      iex> IndifferentAccess.indifferentize(%{"schedulers" => %{"tls" => "3"}}, as: :map)[:schedulers][:tls]
+      iex> IndifferentAccess.indifferentize(%{"schedulers" => %{"tls" => "3"}}, as: :map, strategy: :replace)[:schedulers][:tls]
       "3"
 
-      iex> IndifferentAccess.initialize_atoms_map()
-      iex> IndifferentAccess.indifferentize(%{"schedulers" => %{"tls" => "3", "random_string" => "2"}}, as: :map)[:schedulers]
+      iex> IndifferentAccess.indifferentize(%{"schedulers" => %{"tls" => "3", "random_string" => "2"}}, as: :map, strategy: :replace)[:schedulers]
       %{:tls => "3", "random_string" => "2"}
   """
-  def indifferentize(params, opts \\ []) when is_map(params) do
+  def indifferentize(params, opts \\ [as: :struct, strategy: :replace]) when is_map(params) do
     case opts[:as] do
       :map -> indifferentize_map(params, opts)
-      nil -> Params.new(params, opts)
+      :struct -> Params.new(params, opts)
     end
   end
 
@@ -42,17 +40,17 @@ defmodule IndifferentAccess do
   Returns a map with String keys replaced or supplemented by Atom keys where equivalent atoms exist.
 
   ## Examples
-      iex> IndifferentAccess.initialize_atoms_map()
-      iex> IndifferentAccess.indifferentize_map(%{"schedulers" => "4"})
+      iex> IndifferentAccess.indifferentize_map(%{"schedulers" => "4"}, strategy: :replace)
       %{schedulers: "4"}
 
-      iex> IndifferentAccess.initialize_atoms_map()
       iex> IndifferentAccess.indifferentize_map(%{"schedulers" => "4"}, strategy: :augment)
       %{:schedulers => "4", "schedulers" => "4"}
 
-      iex> IndifferentAccess.initialize_atoms_map()
-      iex> IndifferentAccess.indifferentize_map(%{"schedulers" => %{"tls" => "3", "others" => "2"}})
+      iex> IndifferentAccess.indifferentize_map(%{"schedulers" => %{"tls" => "3", "others" => "2"}}, strategy: :replace)
       %{schedulers: %{"others" => "2", :tls => "3"}}
+
+      iex> IndifferentAccess.indifferentize_map(%{"schedulers" => %{"tls" => "3", "others" => "2"}}, strategy: :static)
+      ** (RuntimeError) `strategy: :static` is only valid within IndifferentAccess.Params struct, not when using `as: :map` option in plug or indifferentize_map directly
   """
   def indifferentize_map(map, opts \\ [])
 
@@ -64,25 +62,28 @@ defmodule IndifferentAccess do
 
       Enum.reduce(map, %{}, fn
         {key, value}, accum when is_binary(key) ->
-          existing_atom = atoms_map()[key]
           indifferent_value = indifferentize_map(value, opts)
 
           case opts[:strategy] do
             :augment ->
-              if existing_atom,
+              if existing_atom(key),
                 do:
                   accum
-                  |> Map.put_new(existing_atom, indifferent_value)
+                  |> Map.put_new(existing_atom(key), indifferent_value)
                   |> Map.put(key, indifferent_value),
                 else: Map.put(accum, key, indifferent_value)
 
-            nil ->
-              if existing_atom && existing_atom not in map_keys,
+            :replace ->
+              if existing_atom(key) && existing_atom(key) not in map_keys,
                 do:
                   accum
-                  |> Map.put_new(existing_atom, indifferent_value)
+                  |> Map.put_new(existing_atom(key), indifferent_value)
                   |> Map.delete(key),
                 else: Map.put(accum, key, indifferent_value)
+
+            :static ->
+              raise "`strategy: :static` is only valid within IndifferentAccess.Params struct," <>
+                      " not when using `as: :map` option in plug or indifferentize_map directly"
           end
 
         {key, value}, accum ->
@@ -97,20 +98,9 @@ defmodule IndifferentAccess do
 
   def indifferentize_map(other, _opts), do: other
 
-  def initialize_atoms_map() do
-    atoms_count = :erlang.system_info(:atom_count)
-
-    existing_atoms_map =
-      Enum.map(0..(atoms_count - 1), fn i ->
-        atom = :erlang.binary_to_term(<<131, 75, i::24>>)
-        {to_string(atom), atom}
-      end)
-      |> Map.new()
-
-    Application.put_env(:indifferent_access, :all_atoms_map, existing_atoms_map)
-  end
-
-  def atoms_map() do
-    Application.get_env(:indifferent_access, :all_atoms_map)
+  defp existing_atom(key) do
+    String.to_existing_atom(key)
+  rescue
+    ArgumentError -> nil
   end
 end

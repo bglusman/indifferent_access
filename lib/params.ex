@@ -10,7 +10,7 @@ defmodule IndifferentAccess.Params do
 
   @behaviour Access
 
-  def new(params, opts \\ []) do
+  def new(params, opts \\ [strategy: :replace]) do
     %Params{params: params, opts: opts}
   end
 
@@ -73,17 +73,17 @@ defmodule IndifferentAccess.Params do
 
   defp wrap(any, :static), do: any
 
-  defp wrap(map, nil) when is_map(map) do
+  defp wrap(map, :replace) when is_map(map) do
     new(map)
   end
 
-  defp wrap(list, nil) when is_list(list) do
-    for item <- list, do: wrap(item, nil)
+  defp wrap(list, :replace) when is_list(list) do
+    for item <- list, do: wrap(item, :replace)
   end
 
-  defp wrap({:ok, any}, nil) do
-    {:ok, wrap(any, nil)}
+  defp wrap({:ok, any}, :replace) do
+    {:ok, wrap(any, :replace)}
   end
 
-  defp wrap(other, nil), do: other
+  defp wrap(other, :replace), do: other
 end
