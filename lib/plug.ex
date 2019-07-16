@@ -26,7 +26,8 @@ defmodule IndifferentAccess.Plug do
   end
 
   @doc """
-    This is
+    This is meant to be called in a Plug pipeline, and assumes that params and query_params have already been fetched prior to this call.
+    The valid opts are `:as` and `:strategy`, which are set to default values of `:struct` and `:replace` by init/1
   """
   def call(conn, opts) do
     conn
