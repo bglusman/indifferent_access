@@ -13,7 +13,7 @@ defmodule IndifferentAccess.Plug do
   Note that this option isn't truly "indifferent" and will only support atom access because it has replaced the
   strings with atoms as the keys.
 
-  There is another option that is not reccomended to also pass ``strategy: :augment`
+  There is another option that is not reccomended to also pass `strategy: :augment`
   in addition to `as: :map` and it will leave string keys in place alongside additional atom keys pointing to the
   same value.  Note this basically renders enumeration on the map useless/confusing, and also makes updates to the map
   problematic as the two values will diverge. This version may not be supported long term, but since this is an experimental
